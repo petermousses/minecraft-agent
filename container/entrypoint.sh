@@ -20,6 +20,12 @@ if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9._-]+$ || "$RUN_ID" == "." || "$RUN_ID" == ".." 
 fi
 export RUN_ID
 
+server_log="$MC_SERVER_DIR/logs/latest.log"
+mkdir -p "$(dirname "$server_log")"
+if [[ -f "$server_log" ]]; then
+  mv "$server_log" "$MC_SERVER_DIR/logs/latest.prestart.$RUN_ID.$$.log"
+fi
+
 xvfb_pid=
 server_pid=
 agent_pid=
@@ -128,6 +134,16 @@ for _ in $(seq 1 300); do
 done
 if ! port_open 25576; then
   echo 'Minecraft server did not open its private port.' >&2
+  exit 1
+fi
+
+for _ in $(seq 1 360); do
+  kill -0 "$server_pid" 2>/dev/null || { echo 'Minecraft server exited during world initialization.' >&2; exit 1; }
+  if grep -Fq '[Server thread/INFO]: Done (' "$server_log" 2>/dev/null; then break; fi
+  sleep 1
+done
+if ! grep -Fq '[Server thread/INFO]: Done (' "$server_log" 2>/dev/null; then
+  echo 'Minecraft server did not finish world initialization within six minutes.' >&2
   exit 1
 fi
 

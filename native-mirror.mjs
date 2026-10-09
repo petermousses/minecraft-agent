@@ -5,7 +5,7 @@ import {existsSync,statSync,readFileSync} from 'node:fs';
 export function captureHeartbeatGuard(read,now=Date.now){let last=0;return ()=>{try{const h=read();if(h.encoderAlive&&h.frames>0)last=Math.max(last,h.time);}catch{}return last>0&&now()-last<8000;};}
 export function installNativeMirror(bot,{port=Number(process.env.NATIVE_MIRROR_PORT||25578)}={}){
  const Item=itemFactory('1.16.5');
- const server=mc.createServer({host:'127.0.0.1',port,version:'1.16.5','online-mode':false,keepAlive:true,motd:'Read-only agent view',maxPlayers:1});
+ const server=mc.createServer({host:'127.0.0.1',port,version:'1.16.5','online-mode':false,keepAlive:true,kickTimeout:120000,motd:'Read-only agent view',maxPlayers:1});
  const healthyRecording=captureHeartbeatGuard(()=>JSON.parse(readFileSync('native-client/capture-heartbeat.json','utf8')));
  const base=new Map(),chunks=new Map(),lights=new Map(),blocks=new Map(),spawns=new Map(),metadata=new Map(),other=[];let viewer=null,teleportId=100000,joined=false;
  const skip=new Set(['keep_alive','kick_disconnect','compress','success','encryption_begin']);
@@ -26,9 +26,12 @@ export function installNativeMirror(bot,{port=Number(process.env.NATIVE_MIRROR_P
  bot._client.on('packet',(data,meta)=>{if(meta.state!=='play'||skip.has(meta.name)||meta.name==='position')return;cache(meta.name,data);send(meta.name,data);});
  let camera=null;function position(){if(!bot.entity)return;const p=bot.entity.position,previous=camera;camera={yaw:bot.entity.yaw,pitch:bot.entity.pitch};if(previous)bot.emit('nativeCameraTurn',{degrees:Math.hypot(angleDelta(camera.yaw,previous.yaw),camera.pitch-previous.pitch)*180/Math.PI});send('position',{x:p.x,y:p.y,z:p.z,yaw:(180-camera.yaw*180/Math.PI)%360,pitch:-camera.pitch*180/Math.PI,flags:0,teleportId:teleportId++});}
  server.on('login',client=>{
-  console.log('Native display connected; allow resource loading');
-  setTimeout(async()=>{const deadline=Date.now()+120000;while(!existsSync('native-client/resources-ready.txt')||!bot.entity||!base.has('login')||chunks.size===0){if(client.ended)return;if(Date.now()>deadline){client.end('Native resources failed to load');return;}await new Promise(r=>setTimeout(r,250));}if(client.ended)return;viewer=client;
-   for(const [name,data] of base)send(name,data);
+ console.log('Native display connected; allow resource loading');
+  setTimeout(async()=>{const deadline=Date.now()+120000;while(!bot.entity||!base.has('login')){if(client.ended)return;if(Date.now()>deadline){client.end('Bot login state failed to load');return;}await new Promise(r=>setTimeout(r,250));}if(client.ended)return;
+   client.write('login',base.get('login'));
+   while(!existsSync('native-client/resources-ready.txt')||chunks.size===0){if(client.ended)return;if(Date.now()>deadline){client.end('Native resources or chunks failed to load');return;}await new Promise(r=>setTimeout(r,250));}if(client.ended)return;
+   viewer=client;
+   for(const [name,data] of base)if(name!=='login')send(name,data);
    send('update_view_position',{chunkX:Math.floor(bot.entity.position.x/16),chunkZ:Math.floor(bot.entity.position.z/16)});position();
    for(const data of chunks.values())send('map_chunk',data);
    for(const data of lights.values())send('update_light',data);

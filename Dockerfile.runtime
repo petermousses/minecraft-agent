@@ -16,26 +16,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY . .
+COPY package.json package-lock.json patch-pathfinder.mjs prepare-viewer.mjs recording-client.js item-textures.json ./
+RUN npm ci
 
+COPY research/version-1.16.5.json /app/research/version-1.16.5.json
+COPY native-client/install.py /app/native-client/install.py
 ARG TARGETARCH
-RUN npm ci \
-    && ./build-observer.sh \
-    && case "${TARGETARCH:-arm64}" in \
+RUN case "${TARGETARCH:-arm64}" in \
          arm64) native_platform=linux-arm64 ;; \
          amd64) native_platform=linux-x64 ;; \
          *) echo "unsupported container architecture: ${TARGETARCH}" >&2; exit 1 ;; \
        esac \
-    && python3 native-client/install.py --platform "$native_platform" \
-    && ./native-client/build.sh \
-    && curl -fsSL 'https://piston-data.mojang.com/v1/objects/1b557e7b033b583cd9f66746b7a9ab1ec1673ced/server.jar' -o /tmp/minecraft-server.jar \
+    && python3 native-client/install.py --platform "$native_platform"
+
+RUN curl -fsSL 'https://piston-data.mojang.com/v1/objects/1b557e7b033b583cd9f66746b7a9ab1ec1673ced/server.jar' -o /tmp/minecraft-server.jar \
     && echo '1b557e7b033b583cd9f66746b7a9ab1ec1673ced  /tmp/minecraft-server.jar' | sha1sum -c - \
     && install -D -m 0444 /tmp/minecraft-server.jar /opt/minecraft/server.jar \
-    && rm /tmp/minecraft-server.jar \
+    && rm /tmp/minecraft-server.jar
+
+COPY . .
+RUN ./build-observer.sh \
+    && ./native-client/build.sh \
     && groupadd --gid 10001 minecraft \
     && useradd --uid 10001 --gid minecraft --create-home --home-dir /home/minecraft --shell /usr/sbin/nologin minecraft \
-    && mkdir -p /data/server /app/runs \
-    && chown minecraft:minecraft /data/server /app/runs /app/native-client
+    && mkdir -p /data/server /app/runs /app/logs \
+    && chown minecraft:minecraft /data/server /app/runs /app/logs /app/native-client
 
 ENV MC_SERVER_DIR=/data/server \
     MC_SERVER_JAR=/opt/minecraft/server.jar \
