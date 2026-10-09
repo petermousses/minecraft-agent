@@ -1,0 +1,77 @@
+services:
+  runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile.runtime
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 2m
+    mem_limit: 5g
+    cpus: 4.0
+    expose:
+      - "3077"
+      - "3078"
+    environment:
+      EULA: ${EULA:?set EULA=TRUE after accepting the Minecraft EULA}
+      LITELLM_API_KEY: ${LITELLM_API_KEY:?set LITELLM_API_KEY at runtime}
+      LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://api.ai.omv.mousses.xyz}
+      PLANNER_MODEL: ${PLANNER_MODEL:-qwen3.8-27b}
+      CONTROLLER_MODEL: ${CONTROLLER_MODEL:-jevk5-4b-v0.3}
+      RUN_ID: ${RUN_ID:-}
+      MC_VIEW_DISTANCE: ${MC_VIEW_DISTANCE:-4}
+      NODE_OPTIONS: --max-old-space-size=768
+      NATIVE_JAVA_XMX: 768M
+      NATIVE_RENDER_DISTANCE: ${NATIVE_RENDER_DISTANCE:-4}
+      LP_NUM_THREADS: ${LP_NUM_THREADS:-3}
+      VIEWER_PREFIX: /viewer
+    volumes:
+      - server-data:/data/server
+      - run-data:/app/runs
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl -fsS http://127.0.0.1:3078/ >/dev/null &&
+          curl -fsS http://127.0.0.1:3077/viewer/ >/dev/null &&
+          bash -c '</dev/tcp/127.0.0.1/25576'
+      interval: 20s
+      timeout: 5s
+      retries: 12
+      start_period: 6m
+    networks:
+      - private
+
+  frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.25
+    depends_on:
+      runtime:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      RUNTIME_HOST: runtime
+    volumes:
+      - run-data:/var/www/runs:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 4
+    networks:
+      - private
+
+volumes:
+  server-data:
+    name: minecraft-agent-server
+  run-data:
+    name: minecraft-agent-runs
+
+networks:
+  private:
+    name: minecraft-agent-private

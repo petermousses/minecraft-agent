@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  workflow_dispatch:
+  #pull_request:
+  #push:
+  #  branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+      - name: Check source syntax
+        run: |
+          set -euo pipefail
+          node --check nether-agent.mjs
+          node --check native-mirror.mjs
+          python3 -m py_compile native-client/launch.py
+          bash -n container/entrypoint.sh
+      - name: Validate Compose configuration
+        env:
+          EULA: "TRUE"
+          LITELLM_API_KEY: validation-placeholder
+        run: docker compose config --quiet
+      - name: Render Kubernetes manifests
+        run: kubectl kustomize deploy/k8s > /dev/null

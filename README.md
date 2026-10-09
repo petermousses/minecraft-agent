@@ -1,6 +1,6 @@
-# Astra and JEV Minecraft agent
+# LiteLLM and JEVK5 Minecraft agent
 
-This project uses GPT-6 Astra or GPT-5.6 Sol to plan and JEV to select player actions in Minecraft Java 1.16.5. It uses the official vanilla server and Mineflayer. A read-only Java sensor can report the exact dragon head position. It does not change game rules or entity state. Each selected action is sent to the game through the normal player protocol.
+This project uses a locally hosted LiteLLM planner and JEVK5-compatible controller to select player actions in Minecraft Java 1.16.5. It uses the official vanilla server and Mineflayer. A read-only Java sensor can report the exact dragon head position. It does not change game rules or entity state. Each selected action is sent to the game through the normal player protocol.
 
 ## Latest verified result
 
@@ -18,9 +18,30 @@ The video is 960 × 540 at 20 frames per second, without audio. A translucent fu
 
 ## Credentials
 
-Model calls obtain the OpenRouter key from Google Secret Manager and keep it in process memory. The current scripts refer to the original deployment's project and secret name; these names are not credentials. Configure those references for your own project in `model-relay.mjs` and `models.mjs`. For the relay, authenticate with Google application default credentials, grant access to the secret, and set `MODEL_RELAY=http://127.0.0.1:3099` when starting the agent. Do not place keys in source files or run logs.
+Model calls use the LiteLLM server at `https://api.ai.omv.mousses.xyz`. Copy `.env.example` to `.env` and set `LITELLM_API_KEY`; `.env` is ignored by Git and loaded automatically by the model client. Environment variables override `.env`, so a rotated key can also be supplied by the launching shell. Restart the agent after changing the key. The key is kept out of source files and logs. To use the optional loopback relay, start `node model-relay.mjs` and set `MODEL_RELAY=http://127.0.0.1:3099` for the agent.
 
-The native renderer and launch scripts were developed on macOS. Runtime paths and local server settings must be configured for another machine. Historical review notes describe earlier versions; use the current code and the result above for the latest behavior.
+The native renderer and launch scripts were developed on macOS and are also packaged for Linux containers. Historical review notes describe earlier versions; use the current code and the result above for the latest behavior.
+
+## Container and Kubernetes deployment
+
+GitHub Actions validates the Compose and Kustomize configuration, then builds multi-architecture `linux/amd64` and `linux/arm64` images. The image workflow publishes `ghcr.io/petermousses/minecraft-agent-runtime` and `ghcr.io/petermousses/minecraft-agent-frontend` on pushes to `main` and version tags. Kustomize starts with the `main` tags; for a pinned deployment, replace those tags with the image digests shown in the GHCR package details. The runtime requests 2 CPU and 3 GiB and is capped at 4 CPU and 5 GiB; the frontend adds 250 millicpu and 256 MiB at its limit.
+
+The Kubernetes deployment runs both images in one pod and stores the world and run artifacts on separate persistent volume claims. It needs a default StorageClass, a `ghcr-pull` image-pull secret with GHCR `read:packages` access, and a `minecraft-agent-secrets` Secret containing `EULA=TRUE` and `LITELLM_API_KEY`. Copy `deploy/k8s/secret.example.yaml` outside the repository, replace the API key, and apply that file; never commit the populated Secret. The ingress uses `minecraft-agent.omv.mousses.xyz`; point its DNS record at Traefik, or change that host in `deploy/k8s/ingress.yaml` and both certificate manifests.
+
+After the images have been published from `main`, create the registry pull secret and apply the app:
+
+```sh
+kubectl create namespace minecraft-agent
+kubectl -n minecraft-agent create secret docker-registry ghcr-pull \
+  --docker-server=ghcr.io \
+  --docker-username=petermousses \
+  --docker-password="$CR_PAT"
+kubectl apply -f /secure/path/minecraft-agent-secrets.yaml
+kubectl apply -k deploy/k8s
+kubectl -n minecraft-agent rollout status deployment/minecraft-agent --timeout=10m
+```
+
+`main` is a mutable bootstrap tag, so restart the deployment after a later image push, or pin the Kustomize image entries to the published digests. To inspect the app without ingress or DNS, run `kubectl -n minecraft-agent port-forward service/minecraft-agent 8080:80` and open `http://127.0.0.1:8080`.
 
 ## Game settings
 
@@ -36,14 +57,13 @@ The selected seed has a village, three supply chests with 21 obsidian, and a nat
 
 ## Model roles
 
-The planner sets the current objective, item targets, and a travel waypoint. JEV selects one available action from current game observations. Actions include travel, mining one block, collecting a drop, crafting, opening a chest, eating, sleeping, and combat interactions. Mineflayer handles the movement path and game protocol. This is structured-state control, not control from screenshots or individual key presses. The models can see blocks in loaded chunks. Known seed coordinates are supplied.
+The `qwen3.8-27b` LiteLLM planner sets the current objective, item targets, and a travel waypoint. The `jevk5-4b-v0.3` JEVK5 controller selects one available action from current game observations. Actions include travel, mining one block, collecting a drop, crafting, opening a chest, eating, sleeping, and combat interactions. Mineflayer handles the movement path and game protocol. This is structured-state control, not control from screenshots or individual key presses. The models can see blocks in loaded chunks. Known seed coordinates are supplied.
 
-Model IDs:
+Model IDs and LiteLLM routes:
 
-- `openai/gpt-6-astra` (default) or `openai/gpt-5.6-sol` (`PLANNER_MODEL`), through `/api/v1/chat/completions`
-- `typesafe/jev-1.13`, through `/api/alpha/decisions`
+- `qwen3.8-27b` (planner, `/v1/systemone`) and `jevk5-4b-v0.3` (controller, `/v1/decisions`) are the defaults. Set `PLANNER_MODEL` and `CONTROLLER_MODEL` independently to compatible models exposed by the server if needed.
 
-The key is loaded into process memory from Google Secret Manager. The general `OPENROUTER_API_KEY` environment variable is ignored to prevent use of an unrelated key. The key is not written to run logs.
+The model ids were selected from the server's authenticated `/v1/models` inventory. The model client rejects any route outside `/v1/systemone` and `/v1/decisions`.
 
 ## Files and evidence
 
@@ -61,14 +81,14 @@ Use `./start-server.sh` to start the main server with its read-only sensor. For 
 
 ```sh
 node optimization/nether/freeze-run.mjs NEW_RUN
-PLANNER_MODEL=openai/gpt-6-astra RUN_ID=NEW_RUN \
+PLANNER_MODEL=qwen3.8-27b RUN_ID=NEW_RUN \
 NATIVE_VIEW=1 WAIT_NATIVE=1 NATIVE_RECORD=1 \
 DRAGON_SENSOR_URL=http://127.0.0.1:3093 node nether-agent.mjs
 ```
 
 When the local mirror is listening on port 25578, start `python3 native-client/launch.py`. The agent waits for the hidden client and recorder before the first action. The native client uses an isolated game directory. It does not change the user's Minecraft settings. The recorder stops after the exit portal event. To stop a test at an action boundary, create `runs/NEW_RUN/stop`. Wait for `full-playthrough.mp4.finished.json` before closing the native client.
 
-The native client dependencies are installed with `python3 native-client/install.py`; build the display and capture adapter with `./native-client/build.sh`. The supplied launch script uses its local Java 17 runtime. Model access requires available OpenRouter credit.
+The native client dependencies are installed with `python3 native-client/install.py`; build the display and capture adapter with `./native-client/build.sh`. The supplied launch script uses its local Java 17 runtime. Model access requires the LiteLLM server and a current `LITELLM_API_KEY`.
 
 A new log directory alone does not reset the world. Stop the server, choose a new unused `level-name`, and start it again with the same seed. Keep the old world as evidence.
 
@@ -87,7 +107,6 @@ Run `node --test evidence.test.mjs native-mirror.test.mjs optimization/*.test.mj
 - [Previous seed report](https://www.reddit.com/r/minecraftseeds/comments/m6vjbd/): Java 1.16 seed and portal coordinates.
 - [One-cycle guide](https://mcsr.info/speedrunning/one-cycle): bed support, cover, and timing.
 - [Mineflayer](https://github.com/PrismarineJS/mineflayer), [Pathfinder](https://github.com/PrismarineJS/mineflayer-pathfinder), and [Prismarine Viewer](https://github.com/PrismarineJS/prismarine-viewer).
-- [Official Astra model documentation](https://developers.openai.com/api/docs/models/gpt-6-astra).
 
 ## Combat implementation
 
@@ -101,7 +120,7 @@ The bed timing research also used [AltoClef's bed-combat source](https://github.
 
 ## Recording and control limits
 
-The final route is fixed in `optimization/nether/config.json`. Astra receives game state and route observations; JEV selects bounded actions. Mineflayer performs pathfinding and timed block interactions. This is not screenshot-only or individual-key control. The native view mirrors the bot state. Its camera uses small turns, and its inventory screens show the current item and cursor state. The final run used no live operator guidance or repairs.
+The final route is fixed in `optimization/nether/config.json`. The configured LiteLLM planner receives game state and route observations; JEVK5 selects bounded actions. Mineflayer performs pathfinding and timed block interactions. This is not screenshot-only or individual-key control. The native view mirrors the bot state. Its camera uses small turns, and its inventory screens show the current item and cursor state. The final run used no live operator guidance or repairs.
 
 A recording can contain several capture files if the agent needs a code update. Preserve all active gameplay. Mark each update pause in the combined video. Report deaths and pauses; do not describe such a recording as a deathless or uninterrupted run.
 

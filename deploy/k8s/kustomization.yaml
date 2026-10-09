@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: minecraft-agent
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - persistent-volume-claims.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - certificate.yaml
+  - certificate-staging.yaml
+  - networkpolicy.yaml
+images:
+  - name: minecraft-agent-runtime
+    newName: ghcr.io/petermousses/minecraft-agent-runtime
+    newTag: main
+  - name: minecraft-agent-frontend
+    newName: ghcr.io/petermousses/minecraft-agent-frontend
+    newTag: main

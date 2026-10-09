@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>minecraft agent</title>
+  <link rel="stylesheet" href="/ui/style.css">
+  <script defer src="/ui/vendor/hls.min.js"></script>
+  <script defer src="/ui/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#world" aria-label="minecraft agent home"><span class="cube">▧</span> minecraft agent</a>
+    <span id="connection" class="connection"><i></i> connecting</span>
+  </header>
+  <nav class="tabs" aria-label="runtime views">
+    <button type="button" class="tab active" data-tab="world">world + hud</button>
+    <button type="button" class="tab" data-tab="status">status</button>
+    <button type="button" class="tab" data-tab="native">native video</button>
+  </nav>
+  <main>
+    <section class="panel active" id="panel-world" aria-label="3d world view">
+      <iframe id="viewer" src="/viewer/" title="minecraft 3d viewer" allow="fullscreen"></iframe>
+      <div class="viewer-note">prismarine world view · native renderer is in the native video tab</div>
+    </section>
+    <section class="panel" id="panel-status" aria-label="agent status">
+      <div class="status-head">
+        <div><span class="eyebrow">current run</span><h1 id="run-name">waiting for runtime</h1></div>
+        <span id="stage" class="stage">starting</span>
+      </div>
+      <div id="metrics" class="metrics"></div>
+      <div class="status-columns">
+        <article class="card"><h2>controller</h2><dl id="controller"></dl></article>
+        <article class="card"><h2>planner objective</h2><p id="objective" class="objective">waiting for first observation</p><p id="active" class="muted"></p></article>
+        <article class="card inventory-card"><h2>inventory</h2><div id="inventory" class="inventory"></div></article>
+      </div>
+      <article class="card recent-card"><h2>recent actions</h2><ol id="recent"></ol></article>
+      <details class="raw-card"><summary>raw status json</summary><pre id="raw-status">waiting</pre></details>
+    </section>
+    <section class="panel" id="panel-native" aria-label="native minecraft recording">
+      <div class="video-head"><div><span class="eyebrow">live capture</span><h1>native minecraft view</h1><p id="stream-state" class="muted">waiting for the recorder</p></div><span class="live-pill"><i></i> LIVE</span></div>
+      <div class="video-frame"><video id="native-video" controls muted playsinline></video><div id="video-placeholder" class="video-placeholder">native capture starts after the client joins the local mirror</div></div>
+      <div class="video-foot"><span>960 × 540 · 20 fps · live edge targets ~4 seconds</span><a id="download" class="download hidden" href="#" download>download finished mp4</a></div>
+    </section>
+  </main>
+  <footer><span>local runtime</span><span id="updated">status polling has not started</span></footer>
+</body>
+</html>
