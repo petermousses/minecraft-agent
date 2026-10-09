@@ -57,11 +57,11 @@ The selected seed has a village, three supply chests with 21 obsidian, and a nat
 
 ## Model roles
 
-The configured LiteLLM planner sets the current objective, item targets, and a travel waypoint. The JEVK5 controller selects one available action from current game observations. Actions include travel, mining one block, collecting a drop, crafting, opening a chest, eating, sleeping, and combat interactions. Mineflayer handles the movement path and game protocol. This is structured-state control, not control from screenshots or individual key presses. The models can see blocks in loaded chunks. Known seed coordinates are supplied.
+The `qwen3.8-27b` LiteLLM planner sets the current objective, item targets, and a travel waypoint. The `jevk5-4b-v0.3` JEVK5 controller selects one available action from current game observations. Actions include travel, mining one block, collecting a drop, crafting, opening a chest, eating, sleeping, and combat interactions. Mineflayer handles the movement path and game protocol. This is structured-state control, not control from screenshots or individual key presses. The models can see blocks in loaded chunks. Known seed coordinates are supplied.
 
 Model IDs and LiteLLM routes:
 
-- `jevk5-4b-v0.3` (default planner and JEV-like controller) through `/v1/systemone` and `/v1/decisions`; set `PLANNER_MODEL` and `CONTROLLER_MODEL` to compatible models exposed by the server if needed.
+- `qwen3.8-27b` (planner, `/v1/systemone`) and `jevk5-4b-v0.3` (controller, `/v1/decisions`) are the defaults. Set `PLANNER_MODEL` and `CONTROLLER_MODEL` independently to compatible models exposed by the server if needed.
 
 The model ids were selected from the server's authenticated `/v1/models` inventory. The model client rejects any route outside `/v1/systemone` and `/v1/decisions`.
 

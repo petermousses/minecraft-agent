@@ -7,7 +7,7 @@ if(existsSync(envFile))process.loadEnvFile(envFile);
 export const MODEL_PATHS=Object.freeze({decisions:'/v1/decisions',systemone:'/v1/systemone'});
 const modelPaths=new Set(Object.values(MODEL_PATHS));
 export const LITELLM_BASE_URL=(process.env.LITELLM_BASE_URL||'https://api.ai.omv.mousses.xyz').replace(/\/+$/,'');
-export const plannerModel=process.env.PLANNER_MODEL||'jevk5-4b-v0.3';
+export const plannerModel=process.env.PLANNER_MODEL||'qwen3.8-27b';
 export const controllerModel=process.env.CONTROLLER_MODEL||'jevk5-4b-v0.3';
 export const plannerName=plannerModel.split('/').at(-1);
 export const controllerName=controllerModel.split('/').at(-1);

@@ -15,7 +15,7 @@ services:
       EULA: ${EULA:?set EULA=TRUE after accepting the Minecraft EULA}
       LITELLM_API_KEY: ${LITELLM_API_KEY:?set LITELLM_API_KEY at runtime}
       LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://api.ai.omv.mousses.xyz}
-      PLANNER_MODEL: ${PLANNER_MODEL:-jevk5-4b-v0.3}
+      PLANNER_MODEL: ${PLANNER_MODEL:-qwen3.8-27b}
       CONTROLLER_MODEL: ${CONTROLLER_MODEL:-jevk5-4b-v0.3}
       RUN_ID: ${RUN_ID:-}
       MC_VIEW_DISTANCE: ${MC_VIEW_DISTANCE:-4}
