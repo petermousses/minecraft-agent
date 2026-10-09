@@ -1,7 +1,7 @@
 name: build and publish container images
 
 on:
-  pull_request:
+  #pull_request:
   push:
     branches: [main]
     tags: ['v*.*.*']
