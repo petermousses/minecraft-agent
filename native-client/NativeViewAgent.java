@@ -11,7 +11,7 @@ public class NativeViewAgent {
    for(CtMethod m:c.getDeclaredMethods("glfwCreateWindow"))m.insertBefore("{glfwWindowHint(0x00020004,0);}");
    c.getDeclaredMethod("glfwInit").insertBefore("{if(System.getProperty(\"os.name\").startsWith(\"Mac\"))glfwInitHint(0x00051002,0);}");
    c.getDeclaredMethod("glfwSwapBuffers").insertBefore("{local.agentview.FrameCapture.frame($1);}");}
-   if(name.equals("djz")){c.getDeclaredMethod("s",new CtClass[0]).setBody("{return true;}");c.getDeclaredMethod("a",new CtClass[]{pool.get("don")}).insertAfter("{if($1==null)local.agentview.FrameCapture.resourcesReady();}");}
+   if(name.equals("djz"))c.getDeclaredMethod("s",new CtClass[0]).setBody("{return true;}");
    if(name.equals("dnt")){c.getDeclaredMethod("a",new CtClass[]{pool.get("java.lang.String"),CtClass.intType}).insertBefore("{if (!$1.equals(\"127.0.0.1\") || $2 != Integer.getInteger(\"agent.mirrorPort\", 25578).intValue()) throw new SecurityException(\"This display client only connects to the local read-only mirror\");}");}byte[] out=c.toBytecode();c.detach();System.out.println("Native view: hidden-window compatibility hooks active");return out;}catch(Exception e){e.printStackTrace();return null;}
   }});
  }

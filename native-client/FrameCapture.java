@@ -1,13 +1,17 @@
 package local.agentview;
-import java.nio.*;import java.nio.file.*;import java.io.*;import java.awt.image.BufferedImage;import javax.imageio.ImageIO;import java.util.concurrent.*;import org.lwjgl.glfw.GLFW;import org.lwjgl.opengl.GL11;import org.lwjgl.opengl.GL30;import org.lwjgl.system.MemoryUtil;
+import java.nio.*;import java.nio.file.*;import java.io.*;import java.lang.reflect.Field;import java.awt.image.BufferedImage;import javax.imageio.ImageIO;import java.util.concurrent.*;import org.lwjgl.glfw.GLFW;import org.lwjgl.opengl.GL11;import org.lwjgl.opengl.GL30;import org.lwjgl.system.MemoryUtil;
 public class FrameCapture {
- static long last=0,lastPreview=0,lastHeartbeat=0,lastPoll=0,startNanos=0,frames=0;static ByteBuffer pixels;static int width,height;static volatile boolean busy=false;static String requested="",recording="";static Process encoder;static OutputStream pipe;
+ static long last=0,lastPreview=0,lastHeartbeat=0,lastPoll=0,startNanos=0,frames=0,nextReadyCheck=0;static ByteBuffer pixels;static int width,height;static volatile boolean busy=false,readinessReported=false,readinessLookupErrorReported=false;static int readinessProbeState=-1;static String requested="",recording="";static Process encoder;static OutputStream pipe;static Object minecraft;static Field activeLevel,modelManager,modelGroups;
  static final Path root=Paths.get(System.getProperty("agent.captureDir"));
  static final ExecutorService writer=Executors.newSingleThreadExecutor(r->{Thread t=new Thread(r,"native-frame-writer");t.setDaemon(true);return t;});
  static void finish(){try{if(pipe!=null){pipe.close();if(!encoder.waitFor(30,TimeUnit.SECONDS)){encoder.destroyForcibly();encoder.waitFor();}Files.writeString(Paths.get(recording+".finished.json"),"{\"time\":\""+java.time.Instant.now()+"\",\"frames\":"+frames+",\"fps\":20,\"exitCode\":"+encoder.exitValue()+"}");}}catch(Exception e){e.printStackTrace();}finally{pipe=null;encoder=null;recording="";}}
- public static void resourcesReady(){try{Files.writeString(root.resolve("resources-ready.txt"),java.time.Instant.now().toString());}catch(Exception e){e.printStackTrace();}}
+ // Mojang's 1.16.5 mappings name these fields djz.r=level, djz.aw=modelManager, and elt.h=modelGroups.
+ static void checkResourcesReady(){if(readinessReported)return;long now=System.nanoTime();if(now<nextReadyCheck)return;nextReadyCheck=now+250_000_000L;try{if(minecraft==null){Class<?> type=Class.forName("djz");minecraft=type.getMethod("C").invoke(null);activeLevel=type.getDeclaredField("r");activeLevel.setAccessible(true);modelManager=type.getDeclaredField("aw");modelManager.setAccessible(true);}if(activeLevel.get(minecraft)==null)return;Object models=modelManager.get(minecraft);if(models==null){logReadinessProbe(0);return;}if(modelGroups==null){modelGroups=models.getClass().getDeclaredField("h");modelGroups.setAccessible(true);}boolean ready=modelGroups.get(models)!=null;logReadinessProbe(ready?2:1);if(ready)resourcesReady();}catch(Exception e){if(!readinessLookupErrorReported){readinessLookupErrorReported=true;System.err.println("Native client readiness check failed: "+e);}}}
+ static void logReadinessProbe(int state){if(state!=readinessProbeState){readinessProbeState=state;String[] labels={"model manager unavailable","model groups loading","model groups ready"};System.out.println("Native client world active; "+labels[state]);}}
+ public static void resourcesReady(){try{Files.writeString(root.resolve("resources-ready.txt"),java.time.Instant.now().toString());readinessReported=true;System.out.println("Native client resources ready in active world");}catch(Exception e){e.printStackTrace();}}
  public static void frame(long window){
   local.agentview.NativeUi.tick();
+  checkResourcesReady();
   long now=System.nanoTime();
   if(now-lastPoll>500_000_000L){lastPoll=now;try{Path control=root.resolve("record-path.txt");requested=Files.exists(control)?Files.readString(control).trim():"";}catch(Exception e){requested="";}}
   if(busy||now-last<(requested.isEmpty()?1_000_000_000L:45_000_000L))return;last=now;

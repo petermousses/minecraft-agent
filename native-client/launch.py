@@ -7,7 +7,9 @@ import shutil
 root=pathlib.Path(__file__).resolve().parent
 (root/'resources-ready.txt').unlink(missing_ok=True)
 config=json.load(open(root/'config.json'));game=root/'game';game.mkdir(exist_ok=True)
-(game/'options.txt').write_text('fullscreen:false\noverrideWidth:960\noverrideHeight:540\nrenderDistance:8\nmaxFps:40\nguiScale:4\nviewBobbing:true\npauseOnLostFocus:false\ntutorialStep:none\ngamma:1.0\nadvancedItemTooltips:false\nsoundCategory_master:0.0\n')
+render_distance=int(os.environ.get('NATIVE_RENDER_DISTANCE','4'))
+if not 2<=render_distance<=32:raise RuntimeError('NATIVE_RENDER_DISTANCE must be an integer from 2 to 32')
+(game/'options.txt').write_text(f'fullscreen:false\noverrideWidth:960\noverrideHeight:540\nrenderDistance:{render_distance}\nmaxFps:20\nguiScale:4\nviewBobbing:true\npauseOnLostFocus:false\ntutorialStep:none\ngamma:1.0\nadvancedItemTooltips:false\nsoundCategory_master:0.0\n')
 java=os.environ.get('JAVA')
 if java and os.path.sep not in java:java=shutil.which(java)
 if not java:java=shutil.which('java')

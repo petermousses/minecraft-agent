@@ -18,8 +18,11 @@ services:
       PLANNER_MODEL: ${PLANNER_MODEL:-jevk5-4b-v0.3}
       CONTROLLER_MODEL: ${CONTROLLER_MODEL:-jevk5-4b-v0.3}
       RUN_ID: ${RUN_ID:-}
+      MC_VIEW_DISTANCE: ${MC_VIEW_DISTANCE:-4}
       NODE_OPTIONS: --max-old-space-size=768
       NATIVE_JAVA_XMX: 768M
+      NATIVE_RENDER_DISTANCE: ${NATIVE_RENDER_DISTANCE:-4}
+      LP_NUM_THREADS: ${LP_NUM_THREADS:-3}
       VIEWER_PREFIX: /viewer
     volumes:
       - server-data:/data/server

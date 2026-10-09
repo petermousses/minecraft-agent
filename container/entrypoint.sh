@@ -102,9 +102,19 @@ spawn-npcs=true
 spawn-protection=0
 sync-chunk-writes=true
 use-native-transport=true
-view-distance=8
+view-distance=4
 white-list=false
 PROPERTIES
+fi
+view_distance="${MC_VIEW_DISTANCE:-4}"
+if [[ ! "$view_distance" =~ ^([2-9]|[12][0-9]|3[0-2])$ ]]; then
+  echo 'MC_VIEW_DISTANCE must be an integer from 2 to 32.' >&2
+  exit 64
+fi
+if grep -q '^view-distance=' "$MC_SERVER_DIR/server.properties"; then
+  sed -i "s/^view-distance=.*/view-distance=$view_distance/" "$MC_SERVER_DIR/server.properties"
+else
+  printf 'view-distance=%s\n' "$view_distance" >> "$MC_SERVER_DIR/server.properties"
 fi
 
 if [[ ! -d "/app/runs/$RUN_ID/source" ]]; then
