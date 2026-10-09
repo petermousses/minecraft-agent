@@ -20,7 +20,28 @@ The video is 960 × 540 at 20 frames per second, without audio. A translucent fu
 
 Model calls use the LiteLLM server at `https://api.ai.omv.mousses.xyz`. Copy `.env.example` to `.env` and set `LITELLM_API_KEY`; `.env` is ignored by Git and loaded automatically by the model client. Environment variables override `.env`, so a rotated key can also be supplied by the launching shell. Restart the agent after changing the key. The key is kept out of source files and logs. To use the optional loopback relay, start `node model-relay.mjs` and set `MODEL_RELAY=http://127.0.0.1:3099` for the agent.
 
-The native renderer and launch scripts were developed on macOS. Runtime paths and local server settings must be configured for another machine. Historical review notes describe earlier versions; use the current code and the result above for the latest behavior.
+The native renderer and launch scripts were developed on macOS and are also packaged for Linux containers. Historical review notes describe earlier versions; use the current code and the result above for the latest behavior.
+
+## Container and Kubernetes deployment
+
+GitHub Actions validates the Compose and Kustomize configuration, then builds multi-architecture `linux/amd64` and `linux/arm64` images. The image workflow publishes `ghcr.io/petermousses/minecraft-agent-runtime` and `ghcr.io/petermousses/minecraft-agent-frontend` on pushes to `main` and version tags. Kustomize starts with the `main` tags; for a pinned deployment, replace those tags with the image digests shown in the GHCR package details. The runtime requests 2 CPU and 3 GiB and is capped at 4 CPU and 5 GiB; the frontend adds 250 millicpu and 256 MiB at its limit.
+
+The Kubernetes deployment runs both images in one pod and stores the world and run artifacts on separate persistent volume claims. It needs a default StorageClass, a `ghcr-pull` image-pull secret with GHCR `read:packages` access, and a `minecraft-agent-secrets` Secret containing `EULA=TRUE` and `LITELLM_API_KEY`. Copy `deploy/k8s/secret.example.yaml` outside the repository, replace the API key, and apply that file; never commit the populated Secret. The ingress uses `minecraft-agent.omv.mousses.xyz`; point its DNS record at Traefik, or change that host in `deploy/k8s/ingress.yaml` and both certificate manifests.
+
+After the images have been published from `main`, create the registry pull secret and apply the app:
+
+```sh
+kubectl create namespace minecraft-agent
+kubectl -n minecraft-agent create secret docker-registry ghcr-pull \
+  --docker-server=ghcr.io \
+  --docker-username=petermousses \
+  --docker-password="$CR_PAT"
+kubectl apply -f /secure/path/minecraft-agent-secrets.yaml
+kubectl apply -k deploy/k8s
+kubectl -n minecraft-agent rollout status deployment/minecraft-agent --timeout=10m
+```
+
+`main` is a mutable bootstrap tag, so restart the deployment after a later image push, or pin the Kustomize image entries to the published digests. To inspect the app without ingress or DNS, run `kubectl -n minecraft-agent port-forward service/minecraft-agent 8080:80` and open `http://127.0.0.1:8080`.
 
 ## Game settings
 
