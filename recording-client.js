@@ -3,8 +3,8 @@
  const overlay=document.createElement('canvas');overlay.width=W;overlay.height=H;overlay.style='position:fixed;inset:0;width:100%;height:100%;z-index:99;pointer-events:none';document.body.append(overlay);const hud=overlay.getContext('2d');
  const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');const images=new Map();
  const image=src=>{if(!images.has(src)){const im=new Image();im.src=src;images.set(src,im);}return images.get(src);};
- const icons=image('/textures/1.16.4/gui/icons.png');const widgets=image('/textures/1.16.4/gui/widgets.png');
- fetch('/item-textures.json').then(r=>r.json()).then(d=>textures=d);
+ const viewerPath=location.pathname.replace(/\/?$/,'/');const icons=image(viewerPath+'textures/1.16.4/gui/icons.png');const widgets=image(viewerPath+'textures/1.16.4/gui/widgets.png');
+ fetch('item-textures.json').then(r=>r.json()).then(d=>textures=Object.fromEntries(Object.entries(d).map(([name,path])=>[name,path.replace(/^\/textures\//,viewerPath+'textures/')])));
  function sprite(im,sx,sy,sw,sh,x,y,w,h){if(im.complete&&im.naturalWidth)hud.drawImage(im,sx,sy,sw,sh,x,y,w,h);}
  function drawItem(it,x,y,size){if(!it)return;if(it.name.endsWith('_bed')){hud.fillStyle=it.name.startsWith('yellow')?'#e9be2b':'#eee';hud.fillRect(x+size*.12,y+size*.26,size*.78,size*.47);hud.fillStyle='#fafafa';hud.fillRect(x+size*.12,y+size*.26,size*.24,size*.47);hud.fillStyle='#956339';hud.fillRect(x+size*.12,y+size*.72,size*.78,size*.1);hud.fillRect(x+size*.15,y+size*.8,size*.1,size*.12);hud.fillRect(x+size*.74,y+size*.8,size*.1,size*.12);}else{const src=textures[it.name];if(src){const im=image(src);if(im.complete&&im.naturalWidth)hud.drawImage(im,x,y,size,size);}else{hud.fillStyle='#bbb';hud.fillRect(x+4,y+4,size-8,size-8);}}}
  function text(t,x,y,size=12,color='#fff'){hud.font=`${size}px monospace`;hud.lineWidth=3;hud.strokeStyle='#000b';hud.strokeText(t,x,y);hud.fillStyle=color;hud.fillText(t,x,y);}
@@ -29,8 +29,8 @@
   hud.strokeStyle='#fff';hud.lineWidth=1;hud.beginPath();hud.moveTo(W/2-5,H/2);hud.lineTo(W/2+5,H/2);hud.moveTo(W/2,H/2-5);hud.lineTo(W/2,H/2+5);hud.stroke();
   if(state.won&&state.dragonKilled){hud.fillStyle='#06111ce8';hud.fillRect(160,190,640,105);text('ENDER DRAGON DEFEATED',245,234,25,'#c0ff91');text('Exit portal reached · Game completion verified',221,270,17);}
  }
- async function tick(){try{state=await(await fetch('http://127.0.0.1:3078')).json();if(state.record&&!recorder&&new URL(location.href).searchParams.get('run')===state.run)start();if(!state.record&&recorder?.state==='recording')recorder.stop();}catch{}setTimeout(tick,250);}
+ async function tick(){try{state=await(await fetch('/api/status',{cache:'no-store'})).json();if(state.record&&!recorder&&new URL(location.href).searchParams.get('run')===state.run)start();if(!state.record&&recorder?.state==='recording')recorder.stop();}catch{}setTimeout(tick,250);}
  let last=0;function paint(now){if(now-last>75){last=now;drawHUD();const game=[...document.querySelectorAll('canvas')].find(c=>c!==canvas&&c!==overlay);if(game){ctx.drawImage(game,0,0,W,H);ctx.drawImage(overlay,0,0);}}requestAnimationFrame(paint);}
- function start(){const captureId=crypto.randomUUID();recorder=new MediaRecorder(canvas.captureStream(12),{mimeType:'video/webm;codecs=vp9',videoBitsPerSecond:800000});recorder.ondataavailable=e=>{if(e.data.size)uploads=uploads.then(()=>fetch('http://127.0.0.1:3078/recording?id='+captureId,{method:'POST',body:new Blob([e.data],{type:'text/plain'})}));};recorder.onstop=async()=>{await uploads;await fetch('http://127.0.0.1:3078/recording/done?id='+captureId,{method:'POST'});recorder=null;};recorder.start(2000);fetch('http://127.0.0.1:3078/recording/start?id='+captureId,{method:'POST'});}
+ function start(){const captureId=crypto.randomUUID();recorder=new MediaRecorder(canvas.captureStream(12),{mimeType:'video/webm;codecs=vp9',videoBitsPerSecond:800000});recorder.ondataavailable=e=>{if(e.data.size)uploads=uploads.then(()=>fetch('/recording?id='+captureId,{method:'POST',body:new Blob([e.data],{type:'text/plain'})}));};recorder.onstop=async()=>{await uploads;await fetch('/recording/done?id='+captureId,{method:'POST'});recorder=null;};recorder.start(2000);fetch('/recording/start?id='+captureId,{method:'POST'});}
  requestAnimationFrame(paint);tick();
 })();
