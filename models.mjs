@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 const envFile=fileURLToPath(new URL('.env',import.meta.url));
 if(existsSync(envFile))process.loadEnvFile(envFile);
 
-export const MODEL_PATHS=Object.freeze({decisions:'/v1/decisions',systemone:'/v1/systemone'});
+export const MODEL_PATHS=Object.freeze({decisions:'/v1/decisions',systemone:'/v1/systemone',chatCompletions:'/v1/chat/completions'});
 const modelPaths=new Set(Object.values(MODEL_PATHS));
 export const LITELLM_BASE_URL=(process.env.LITELLM_BASE_URL||'https://api.ai.omv.mousses.xyz').replace(/\/+$/,'');
 export const plannerModel=process.env.PLANNER_MODEL||'qwen3.8-27b';
@@ -59,9 +59,14 @@ export async function plan(state){
  const criteria={advance:objectives[state.stage]||objectives.prepare,reassess:'Recheck the current stage, known route, and inventory deficits before choosing the next objective.'};
  if((state.recent||[]).some(action=>String(action.result||'').startsWith('FAILED ')))criteria.recover='Recover safely from the most recent failed action, then resume the current stage objective.';
  if(Number(state.health)<16||Number(state.oxygen)<15)criteria.survive='Prioritize immediate health and oxygen safety before resuming stage progress.';
- const body={model:plannerModel,state,questions:{objective:{type:'choice',instructions:'Choose the single strategic objective that best fits the current Minecraft state. Respect the current stage, known route, kit deficits, and player safety. Do not invent coordinates or tasks.',criteria}}};
- const r=await request(MODEL_PATHS.systemone,body);
- const selected=r.data.answers?.objective?.choice;
+ const body={model:plannerModel,messages:[
+  {role:'system',content:'You are the strategic planner for a Minecraft agent. Select exactly one objective key from the supplied objectives. Return only a JSON object with one string field named "objective" set to that key. Do not add commentary, coordinates, or tasks.'},
+  {role:'user',content:JSON.stringify({state,objectives:criteria})}
+ ],temperature:0,max_tokens:128,response_format:{type:'json_object'}};
+ const r=await request(MODEL_PATHS.chatCompletions,body);
+ let answer;
+ try{answer=JSON.parse(r.data.choices?.[0]?.message?.content||'');}catch{throw new Error('Planner returned invalid JSON');}
+ const selected=answer?.objective;
  if(!Object.hasOwn(criteria,selected))throw new Error('Invalid planner objective');
  const route=state.knownSeed||{};
  const waypoint={prepare:route.village,entry:route.entryPortal,nether:route.netherRoute?.[0]||route.exitPortal,stronghold:route.activePortal}[state.stage]||null;

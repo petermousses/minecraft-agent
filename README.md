@@ -61,9 +61,9 @@ The `qwen3.8-27b` LiteLLM planner sets the current objective, item targets, and 
 
 Model IDs and LiteLLM routes:
 
-- `qwen3.8-27b` (planner, `/v1/systemone`) and `jevk5-4b-v0.3` (controller, `/v1/decisions`) are the defaults. Set `PLANNER_MODEL` and `CONTROLLER_MODEL` independently to compatible models exposed by the server if needed.
+- `qwen3.8-27b` (planner, `/v1/chat/completions`) and `jevk5-4b-v0.3` (controller, `/v1/decisions`) are the defaults. Set `PLANNER_MODEL` and `CONTROLLER_MODEL` independently to compatible models exposed by the server if needed.
 
-The model ids were selected from the server's authenticated `/v1/models` inventory. The model client rejects any route outside `/v1/systemone` and `/v1/decisions`.
+The model ids were selected from the server's authenticated `/v1/models` inventory. The model client allows only `/v1/chat/completions`, `/v1/decisions`, and `/v1/systemone`; the planner uses chat completions and the controller uses decisions.
 
 ## Files and evidence
 
