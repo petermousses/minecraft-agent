@@ -62,10 +62,14 @@ export async function plan(state){
  const body={model:plannerModel,messages:[
   {role:'system',content:'You are the strategic planner for a Minecraft agent. Select exactly one objective key from the supplied objectives. Return only a JSON object with one string field named "objective" set to that key. Do not add commentary, coordinates, or tasks.'},
   {role:'user',content:JSON.stringify({state,objectives:criteria})}
- ],temperature:0,max_tokens:128,response_format:{type:'json_object'}};
+ ],temperature:0,max_tokens:256,chat_template_kwargs:{enable_thinking:false},response_format:{type:'json_object'}};
  const r=await request(MODEL_PATHS.chatCompletions,body);
+ const choice=r.data.choices?.[0];
+ const content=choice?.message?.content;
+ if(choice?.finish_reason==='length')throw new Error('Planner response reached the output token limit before completing');
+ if(typeof content!=='string'||!content.trim())throw new Error('Planner returned an empty response');
  let answer;
- try{answer=JSON.parse(r.data.choices?.[0]?.message?.content||'');}catch{throw new Error('Planner returned invalid JSON');}
+ try{answer=JSON.parse(content);}catch{throw new Error('Planner returned invalid JSON');}
  const selected=answer?.objective;
  if(!Object.hasOwn(criteria,selected))throw new Error('Invalid planner objective');
  const route=state.knownSeed||{};
