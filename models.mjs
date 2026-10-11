@@ -32,12 +32,17 @@ export async function request(path,body){
 }
 export function compactObservation(state){const knownSeed=state.knownSeed?{...state.knownSeed,bastionChestLoot:state.knownSeed.bastionChestLoot?.map(c=>({...c,loot:c.loot.reduce((a,i)=>({...a,[i.name]:(a[i.name]||0)+i.count}),{})}))}:undefined;return {...state,supplies:state.supplies?{...state.supplies,mobs:state.supplies.mobs?.filter(e=>e.distance<48).sort((a,b)=>a.distance-b.distance).slice(0,16),drops:state.supplies.drops?.filter(e=>!state.position||Math.hypot(e.position.x-state.position.x,e.position.y-state.position.y,e.position.z-state.position.z)<24).slice(0,16)}:undefined,knownSeed,recent:state.recent?.slice(-5).map(({action,result,position})=>({action,result,position})),hotbar:undefined,equipment:undefined,xp:undefined,record:undefined,recordReady:undefined,recordFinished:undefined,looted:undefined};}
 export async function decide(state,options){
+ if(!options.length)throw new Error('No available actions to decide');
+ if(options.length===1){
+  const selected=options[0];
+  return {data:{model:'local-single-option',selected:selected.key,reason:'only one available action'},selected,body:null,model:'local-single-option',latencyMs:0};
+ }
  state=compactObservation(state);
- const criteria=Object.fromEntries(options.map((o,i)=>['a'+i,o.description]));
- const body={model:controllerModel,state:JSON.stringify(state),questions:{action:{type:'choice',instructions:'Control the Minecraft player. Choose one available action that best advances the current planner objective. FIRST choose an offered escape action when a breath cloud threatens the player. Clouds marked safeAtCurrentHeight are vertically separated on verified ground; distance alone does not make them dangerous. Never eat or wait inside a breath cloud. After reaching safety, if health is below 16, eat available food until the food bar is full so health can regenerate. Survival has priority over item reserve targets. Prefer a boat for long water crossings. Craft one before departure, place and board it at water, then row. Dismount and recover it at land. Swim only for short approaches; use side detours when blocked. Never pathfind along the sea floor. Check current inventory; do not keep crafting or collecting after the target is met. Avoid failed actions and needless waiting. Movement and mining options include standard pathfinding, but you own the choice.',criteria}}};
- const r=await request(MODEL_PATHS.decisions,body);const answer=r.data.answers?.action;
- const selected=options[Number(answer?.choice?.slice(1))];
- if(!selected||!Object.hasOwn(criteria,answer.choice))throw new Error('Invalid JEV action');
+ const choices=options.map((o,i)=>({value:'a'+i,description:o.description}));
+ const body={model:controllerModel,input:JSON.stringify(state),questions:[{name:'action',type:'choice',instructions:'Control the Minecraft player. Choose one available action that best advances the current planner objective. FIRST choose an offered escape action when a breath cloud threatens the player. Clouds marked safeAtCurrentHeight are vertically separated on verified ground; distance alone does not make them dangerous. Never eat or wait inside a breath cloud. After reaching safety, if health is below 16, eat available food until the food bar is full so health can regenerate. Survival has priority over item reserve targets. Prefer a boat for long water crossings. Craft one before departure, place and board it at water, then row. Dismount and recover it at land. Swim only for short approaches; use side detours when blocked. Never pathfind along the sea floor. Check current inventory; do not keep crafting or collecting after the target is met. Avoid failed actions and needless waiting. Movement and mining options include standard pathfinding, but you own the choice.',choices}]};
+ const r=await request(MODEL_PATHS.decisions,body);const answer=Array.isArray(r.data.answers)?r.data.answers.find(a=>a.name==='action'):r.data.answers?.action;
+ const choiceIndex=choices.findIndex(choice=>choice.value===answer?.choice);const selected=options[choiceIndex];
+ if(!selected)throw new Error('Invalid JEV action');
  return {...r,selected,body,model:r.data.model||controllerModel};
 }
 export async function plan(state){
